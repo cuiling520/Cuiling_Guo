@@ -1,0 +1,322 @@
+---
+title: "Project J: The role of attention and inhibition in lingual performance across logographic and alphabetic writing system"
+author: "Guo"
+date: "6/12/2019"
+output: html_document
+---
+
+```{r setup}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(lme4) # to fit mixed model
+library(stargazer) # report results in a table
+library(DataExplorer)
+library(haven) # read sav file
+library(apa) # Format Outputs of Statistical Tests According to APA Guidelines
+
+#1 read two averaged datasets 
+eng_data <- read_csv("/Users/ling/desktop/Ling_Project/psytoolkit/data/english_survey_till_apr4.csv")
+cn_data <- read_csv("/Users/ling/desktop/Ling_Project/psytoolkit/data/chinese_survey_till_apr6.csv")
+
+#2 select variables from english data
+desc_eng <- eng_data %>% 
+  select(ID, gender, age, BMI, languageExperiences_alphabet, ADHD, scoreASRS, SD_RT_go, mean_RT_go, prop_inhibitions, prop_omissions, correct_mean_RT, correct_SD_RT, correct_prop_total) %>% 
+  # English proficiency > 3
+  filter(languageExperiences_alphabet > 3) %>% 
+  filter(prop_omissions < 0.2) %>% # Omission rate smaller than 20%, not gonna do it because it will lose a lot of chinese participants (data points)
+  drop_na()
+
+# describe english data
+skimr::skim(desc_eng)
+
+
+#3 mark english participants
+desc_eng$ID <- "English"  
+
+#4 select variables from chinese data
+desc_cn <- cn_data %>% 
+  filter(prop_omissions < 0.2) %>% 
+  select(ID, gender, age, BMI, ADHD, scoreASRS, SD_RT_go, mean_RT_go, prop_inhibitions, prop_omissions, correct_mean_RT, correct_SD_RT, correct_prop_total) %>% 
+  drop_na()
+
+# describe chinese data
+skimr::skim(desc_cn)
+
+#5 mark english participants 
+desc_cn$ID <- "Chinese" 
+
+#6 full join two datasets 
+en_cn_data <- full_join(desc_eng, desc_cn)
+
+#7 filter out omission rate bigger than 0.2 
+#en_cn_data <- en_cn_data %>% 
+ # filter(prop_omissions < 0.2)
+```
+
+```{r summarising data }
+desc_en_cn <- en_cn_data %>% 
+  select(ID, gender, age, mean_RT_go, SD_RT_go, prop_inhibitions, correct_mean_RT, correct_SD_RT, correct_prop_total) %>% 
+  drop_na()
+  filter(!mean_RT_go == "NA") %>% 
+  filter(!correct_mean_RT == "NA")
+
+en_cn_data %>% 
+  group_by(gender) %>% 
+  skimr::skim()
+  
+Hmisc::describe(desc_en_cn)
+pastecs::stat.desc(desc_en_cn)
+psych::describe(desc_en_cn)
+skimr::skim(desc_en_cn)
+summary(arsenal::tableby(ID ~ ., data = desc_en_cn))
+
+```
+
+
+# Introduction  
+
+Word recognition is a higher level of cognitive process that builds on a wide range of human basic cognitive skills. In particular, attention and inhibition may play an important fundamental role in word reading skill. 
+
+Studies have shown the comorbidity of ADHD symptoms and reading difficulty (Shanahan et al., 2006; Willcutt et al., 2010; McGrath et al., 2011; Millter et al., 2013; Miranda et al., 2013), both in Chinese and English language systems (Wang et al., 2017; Sexton, Gelhorn, Bell, & Classi, 2012). Specifically, the deficits of visual attention can be associated with poor reading performance (Casco et al., 1998). Fur8thermore, a 3-year longitudinal study showed that visual spatial attention, i.e., prereading attentional orienting, could predict preschoolers' future reading skill (Franceschini et al., 2012). In a Chinese reading study, only sustained attention, a basic cognitive skill had effect on future reading performance (Yang X et al., 2019).               
+
+Not only attention, but also Ibbotson and Kearvell-White (2015) presented empirical evidence that inhibitory control is a good predictor of grammatical ability, given that individual might need a shared cognitive capacity to cancel an unwanted competition in linguistic performance. Linck et al (2008) also demonstrated that enhanced inhibition control was related to better performance on lexical comprehension and production tasks by bilinguals. In Borella et al's study (2010), specific inhibition-related functions were found to be related to reading comprehension difficulties. Unskillful readers seemed to be specifically impaired when suppression of active non-target stimuli is needed in the task.       
+
+Current study aims to investigate the role of attention and inhibition in reading performance, and the relative contribution of these two executive components in linguistic performance. Furthermore, whether the role and relative contribution of attention and inhibition show differences across two distinctly different language systems, English and Chinese. 
+
+## Hypothesis 1. The score of ASRS is a good predictor for the proportion of inhibitions of Go/No-Go task.   
+
+```{r lm1 ASRS }
+head(en_cn_data)
+lm1 <- lm(prop_inhibitions ~ scoreASRS, data = en_cn_data) 
+summary(lm1) # p=0.016
+
+lm2 <- lm(SD_RT_go ~ scoreASRS, data = en_cn_data) 
+summary(lm2)
+
+# check asumptions
+plot(fitted(lm1), residuals(lm1)) # Linearity
+hist(residuals(lm1)) # normality of residuals
+qqnorm(residuals(lm1)) # normality of residuals
+```
+
+
+## Hypothesis 2. BMI is a good predictor for the proportion of inhibitions of Go/No-Go task.    
+No!  
+```{r lm2 BMI}
+lm2 <- lm(prop_inhibitions ~ BMI, data = en_cn_data) 
+summary(lm2) #p=0.17
+
+# check asumptions
+plot(fitted(lm2), residuals(lm2)) # Linearity
+hist(residuals(lm2)) # normality of residuals
+qqnorm(residuals(lm2)) # normality of residuals
+```
+
+
+## Hypothesis 3. Language is a good predictor for the proportion of inhibitions of Go/No-Go task.  
+Inhibitions don't differ in terms of language groups.  
+
+```{r lm3 lang1}
+lm3 <- lm(prop_inhibitions ~ ID, data = en_cn_data)
+summary(lm3) #p=0.7
+
+# perform t-test on two language groups 
+ # box plot to compare two means
+plot(prop_inhibitions ~ as.factor(ID), data = en_cn_data)
+t_lang <- t.test(prop_inhibitions ~ as.factor(ID), data = en_cn_data)
+t_apa(t_test(prop_inhibitions ~ as.factor(ID), data = en_cn_data), format = "docx")
+apa_print(t_lang)
+```
+
+## Hypothesis 4. Language is a good predictor for the mean reaction time of go stimuli in Go/No-Go task.   
+
+Sustained attention, indicated by the standard deviation of reaction time of go stimuli, showed no differences between two language groups. 
+
+```{r lm4 lang2}
+# perform t-test on two language groups 
+ # box plot to compare two means
+plot(SD_RT_go ~ as.factor(ID), data = en_cn_data)
+t_rt <- t.test(SD_RT_go ~ as.factor(ID), data = en_cn_data)
+t_apa(t_test(SD_RT_go ~ as.factor(ID), data = en_cn_data), format = "docx")
+
+ # check observations of 2 groups 
+en_cn_data %>% 
+  select(ID, SD_RT_go) %>% 
+  drop_na() %>% 
+  group_by(ID) %>% 
+  count()
+
+```
+
+## attention predict word recognition
+
+```{r attention model }
+# English sample 
+lm_attention_en <- lm(correct_mean_RT ~ SD_RT_go, data = desc_eng) 
+summary(lm_attention_en) # p=0.87
+
+ # check asumptions
+plot(fitted(lm_attention_en), residuals(lm_attention_en)) # Linearity
+hist(residuals(lm_attention_en)) # normality of residuals
+qqnorm(residuals(lm_attention_en)) # normality of residuals
+
+# Chinese sample 
+lm_attention_cn <- lm(correct_mean_RT ~ SD_RT_go, data = desc_cn) 
+summary(lm_attention_cn) # p = 0.4
+```
+
+## inhibitions predict word recognition
+
+```{r inhibition on word recognition}
+# English sample
+lm_inhi_en <- lm(correct_mean_RT ~ prop_inhibitions, data = desc_eng) 
+summary(lm_inhi_en) # p=0.82
+
+# Chinese sample
+lm_inhi_cn <- lm(correct_mean_RT ~ prop_inhibitions, data = desc_cn) 
+summary(lm_inhi_cn) # p=0.82
+```
+
+
+## attention + inhibition on LDT?
+
+```{r}
+# English sample
+lm_en <- lm(correct_mean_RT ~ prop_inhibitions + SD_RT_go + scoreASRS , data = desc_eng) 
+summary(lm_en) # p=0.82
+
+summary(lm(correct_mean_RT ~ mean_RT_go , data = desc_eng)) 
+
+
+```
+
+
+## Hypothesis 5. Attention and inhibition, measured in GO/No-Go task, have effects on word recognition.    
+
+```{r read data, include=FALSE }
+# read original non average data, as tidy and non-averaging data, but only Lexical Decision Task's dependent measures aren't averaged.  
+
+# english dataset, mind that object name is the same as chinese one
+non_avg_data <- read_csv("/Users/ling/desktop/Ling_Project/psytoolkit/data/english_survey_non_avg_data.csv")
+# factor some variables
+non_avg_data$ID <- as_factor(non_avg_data$ID)
+non_avg_data$conditions <- as_factor(non_avg_data$conditions)
+non_avg_data$word_pair <- paste(non_avg_data$char1, non_avg_data$char2, sep = "_")
+#select some variables
+en_data <- non_avg_data %>% 
+      # English proficiency > 3
+  filter(languageExperiences_alphabet > 3) %>% 
+  select(ID, mean_RT_go, SD_RT_go, word_pair, conditions, RT, status, prop_inhibitions, ADHD, scoreASRS) %>% 
+  # status "1" = LDT correct response
+  filter(status == "1" ) %>% 
+  drop_na()
+
+# recode SD_RT_go (numeric variable) into 3 levels caterogical variable 
+en_data <- en_data %>% 
+  mutate(RT_variability = as.factor(case_when(SD_RT_go > 30 & SD_RT_go < 58 ~ "low",
+            SD_RT_go > 59 & SD_RT_go < 85 ~ "medium",
+            SD_RT_go > 87 ~ "high")),
+         inhibition = as.factor(case_when(prop_inhibitions > 0.1 & prop_inhibitions <= 0.5 ~ "low_inhi",
+            prop_inhibitions > 0.5 & prop_inhibitions <= 1 ~ "high_inhi"))) 
+
+# chinese data
+non_avg_data <- read_csv("/Users/ling/desktop/Ling_Project/psytoolkit/data/chinese_survey_non_avg_data.csv")
+# factor some variables
+non_avg_data$ID <- as_factor(non_avg_data$ID)
+non_avg_data$conditions <- as_factor(non_avg_data$conditions)
+non_avg_data$word_pair <- paste(non_avg_data$char1, non_avg_data$char2, sep = "_")
+#select some variables
+cn_data <- non_avg_data %>% 
+  select(ID, mean_RT_go,SD_RT_go, word_pair, conditions, RT, status, prop_inhibitions, ADHD, scoreASRS) %>% 
+  filter(status == "1" ) %>% 
+  drop_na()
+
+# recode SD_RT_go (numeric variable) into 3 levels caterogical variable 
+cn_data <- cn_data %>% 
+  mutate(RT_variability = as.factor(case_when(SD_RT_go > 30 & SD_RT_go < 61 ~ "low",
+            SD_RT_go > 61 & SD_RT_go < 102 ~ "medium",
+            SD_RT_go > 102 ~ "high")),
+         inhibition = as.factor(case_when(prop_inhibitions > 0.1 & prop_inhibitions <= 0.5 ~ "low_inhi",
+            prop_inhibitions > 0.5 & prop_inhibitions <= 1 ~ "high_inhi"))) 
+```
+
+### Test hypothesis 5 in English groups    
+```{r english mixed model, echo=FALSE}
+lme0 <- lmer(RT ~ 1 + (1|ID) + (1|word_pair), data = en_data, REML = FALSE)
+lme1 <- lmer(RT ~ conditions + (1|ID)+ (1|word_pair), data = en_data, REML = FALSE)
+lme2 <- lmer(RT ~  inhibition + conditions + (1|ID)+ (1|word_pair), data = en_data, REML = FALSE)
+lme3 <- lmer(RT ~  RT_variability + conditions + (1|ID)+ (1|word_pair), data = en_data,REML = FALSE)
+summary(lme3)
+
+anova(lme0, lme1) # condition is significant predictor
+anova(lme1, lme2) # prop_inhibitions is not significant predictor
+anova(lme1, lme3) # RT_variability is a significant predictor
+
+# check assumptions
+plot(lme1) # looks fine
+hist(residuals(lme1)) # looks normally distrubuted
+qqnorm(resid(lme1))
+qqline(resid(lme1))  # most of the points fall onto the line
+
+# print the report
+stargazer(lme3, type = "text", 
+          title = "Linear Mixed Model Results on English Speaking Group", 
+          dep.var.labels="LDT Reaction Time",
+          covariate.labels=c("Low RT Variability", "Medium RT Variability", "Unrelated Words", "Non-Words"),
+          digits = 2,
+          star.cutoffs = c(0.05, 0.01, 0.001),
+          digit.separator = "")
+```
+
+### Test hypothesis 5 in Chinese groups    
+```{r chinese mixed model, echo=FALSE}
+lme0 <- lmer(RT ~ 1 + (1|ID) + (1|word_pair), data = cn_data, REML = FALSE)
+lme1 <- lmer(RT ~ conditions + (1|ID)+ (1|word_pair), data = cn_data, REML = FALSE)
+lme2 <- lmer(RT ~  inhibition + conditions + (1|ID)+ (1|word_pair), data = cn_data, REML = FALSE)
+lme3 <- lmer(RT ~  RT_variability + conditions + (1|ID)+ (1|word_pair), data = cn_data,REML = FALSE)
+summary(lme1)
+
+anova(lme0, lme1) # condition is significant predictor
+anova(lme1, lme2) # prop_inhibitions is not significant predictor
+anova(lme1, lme3) # RT_variability is not a significant predictor 
+
+# check assumptions
+plot(lme1) # looks fine
+hist(residuals(lme1)) # looks normally distrubuted
+qqnorm(resid(lme1))
+qqline(resid(lme1))  # most of the points fall onto the line
+
+# print out results
+stargazer(lme1, type = "text", 
+          title = "Linear Mixed Model Results on Chinese Speaking Group", 
+          dep.var.labels="LDT Reaction Time",
+          covariate.labels=c("Low Accuracy Words", "Low Accuracy Non-Words", "High Accuracy Non-Words"),
+          digits = 2,
+          star.cutoffs = c(0.05, 0.01, 0.001),
+          digit.separator = "")
+```
+
+
+```{r sav file}
+sav_file <- read_sav("/Users/ling/downloads/project_J_SPSS_dataset.sav")
+library(SPSStoR)
+
+file <- read_spss('/Users/ling/downloads/Suggested_primary_syntax.sps')
+
+file <- paste(system.file('/Users/ling/downloads/Suggested_primary_syntax.sps', package = 'SPSStoR'), 
+              "/getDescExamp.txt", sep = '')
+spss_to_r(file)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
